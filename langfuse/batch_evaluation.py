@@ -965,6 +965,9 @@ class BatchEvaluationRunner:
                 logger.error(
                     "Failed to fetch batch after %s retries: %s", max_retries, e
                 )
+                # Scores from the pages already processed are still buffered; an
+                # incomplete result must not strand them until a later flush.
+                self.client.flush()
 
                 return self._build_result(
                     total_items_fetched=total_items_fetched,

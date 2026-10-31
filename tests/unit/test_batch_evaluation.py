@@ -238,13 +238,14 @@ async def test_max_items_reached_on_last_page_has_no_resume_token():
 
 @pytest.mark.asyncio
 async def test_fetch_failure_returns_resume_token_for_failed_page():
-    runner, api, _ = make_runner([make_observation(i) for i in range(6)])
+    runner, api, client = make_runner([make_observation(i) for i in range(6)])
     api.fail_on_call = 2
 
     failed = await run(runner, fetch_batch_size=2, max_retries=0)
 
     assert failed.completed is False
     assert failed.total_items_processed == 2
+    client.flush.assert_called_once()
     token = failed.resume_token
     assert token is not None
     assert token.cursor == "2"
@@ -256,6 +257,18 @@ async def test_fetch_failure_returns_resume_token_for_failed_page():
     assert resumed.completed is True
     assert set(resumed.item_evaluations) == {"obs-3", "obs-2", "obs-1", "obs-0"}
     assert api.calls[-1]["request_options"] == {"max_retries": 3}
+
+
+@pytest.mark.asyncio
+async def test_fetch_failure_on_first_page_still_flushes():
+    runner, api, client = make_runner([make_observation(0)])
+    api.fail_on_call = 1
+
+    failed = await run(runner, fetch_batch_size=2, max_retries=0)
+
+    assert failed.completed is False
+    assert failed.total_items_processed == 0
+    client.flush.assert_called_once()
 
 
 @pytest.mark.asyncio
